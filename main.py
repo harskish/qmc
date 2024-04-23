@@ -173,7 +173,12 @@ def plot_2d_broken(func, b1, b2, *args, N=256, **kwargs):
 
 if __name__ == '__main__':
     plot_2d(sobol_owen, 0, 1, seed=0)
-    plot_2d(sobol_owen, 0, 1, seed=0, cp_seed=0)
+    plot_2d(sobol_owen, 0, 2, seed=0)
+    plot_2d(sobol_owen, 1, 2, seed=0)
+    plot_2d(sobol_owen, 0, 3, seed=0)
+    plot_2d(sobol_owen, 1, 3, seed=0)
+    plot_2d(sobol_owen, 2, 3, seed=0)
+    #plot_2d(sobol_owen, 0, 1, seed=0, cp_seed=0)
     #plot_2d(sobol_owen, 0, 1, seed=1)
     #plot_2d(sobol_rds, 0, 1, seed=0)
     #plot_2d(sobol_rds, 0, 1, seed=1)
@@ -218,3 +223,8 @@ if __name__ == '__main__':
 # - does not mean that pixels have to be rendered in a LDS order!
 #   => if the sequence supports skipping, then pixels can still be processed in an arbitrary order
 # - might leave artifacts in the image plane
+
+# Sample decorrelation:
+# - Shufflig (e.g. Owen): works well
+# - Random sample offsetting: might be slow, depending on sampler
+# - Cranley-patterson rotation: increases variance

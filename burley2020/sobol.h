@@ -29,9 +29,20 @@ inline uint32_t laine_karras_permutation(uint32_t x, uint32_t seed) {
   return x;
 }
 
+// Improved LK variant by Nathan Vegdahl (psychopath.io/post/2021_01_30_building_a_better_lk_hash)
+inline uint32_t vegdahl_permutation(uint32_t x, uint32_t seed) {
+  x ^= x * 0x3d20adeau;
+  x += seed;
+  x *= (seed >> 16) | 1;
+  x ^= x * 0x05526c56u;
+  x ^= x * 0x53a22864u;
+  return x;
+}
+
 inline uint32_t nested_uniform_scramble_base2(uint32_t x, uint32_t seed) {
   x = reverse_bits(x);
-  x = laine_karras_permutation(x, seed);
+  //x = laine_karras_permutation(x, seed);
+  x = vegdahl_permutation(x, seed);
   x = reverse_bits(x);
   return x;
 }
