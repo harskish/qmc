@@ -100,7 +100,7 @@ def nested_uniform_scramble_base2(x, seed):
     x = reverse_bits(x)
     return x
 
-def sobol(index: int, dim: int) -> int:
+def sobol_int(index: int, dim: int) -> int:
     assert dim <= 4
     X = 0
     for bit in range(32):
@@ -108,16 +108,16 @@ def sobol(index: int, dim: int) -> int:
         X ^= mask * directions[dim][bit]
     return X
 
-def sobol_float(index: int, dim: int, seed: int = 0) -> float:
+def sobol(index, dim, seed=0) -> float:
     _ = seed
-    return sobol(index, dim) * SOBOL_SCALE_32BIT
+    return sobol_int(index, dim) * SOBOL_SCALE_32BIT
 
-def sobol_float_rds(i, dim, seed=0) -> float:
+def sobol_rds(i, dim, seed=0) -> float:
     seed = hash(seed)
     scramble = hash_combine(seed, hash(dim))
-    return (sobol(i,dim) ^ scramble) * SOBOL_SCALE_32BIT
+    return (sobol_int(i,dim) ^ scramble) * SOBOL_SCALE_32BIT
 
-def sobol_float_owen(i, dim, seed=0) -> float:
+def sobol_owen(i, dim, seed=0) -> float:
     seed = hash(seed)
     index = nested_uniform_scramble_base2(i, seed)
-    return nested_uniform_scramble_base2(sobol(index, dim), hash_combine(seed, dim)) * SOBOL_SCALE_32BIT
+    return nested_uniform_scramble_base2(sobol_int(index, dim), hash_combine(seed, dim)) * SOBOL_SCALE_32BIT

@@ -12,21 +12,54 @@ import struct
 # [4]: github.com/scipy/scipy/pull/10844
 # [5]: jcgt.org/published/0009/04/01/
 
+# Want to optimize for:
+# - low multidimensional discrepancy
+# - high minimum sample distance
+# - efficient computation (preferably in base-2)
+# - random access
+
+# Sobol:
+# - Implements 1D-stratification-preserving permutations of the binary van der Corput sequence
+#   => achieved through nested binary permutations
+#   => LK-hashing also preserves 1D stratification (for all sample counts)
+# - Additionally, the permutaitons are chosen to minimize multidimensional discrepancy
+# - Permutations are stored as a matrix of 'direction numbers'
+
+# Shuffling (randomize index): creates uncorrelated variants of given low-discrepancy sequence
+# - Decorrelates the ordering of samples for padding without changing other poperties
+# - used to stich several sequences together along the dimension axis
+#   => avoids high-dim sequences, which have large sample count requirements for favorable convergence [5, sec. 2.3]
+# - implements padding, which can also be done with pure random noise
+# - Can be implemented using Owen shuffling (!= Owen scrambling)
+
+# Scrambling (randomize value): introduces randomness into QMC sequence
+# - Improves properties of the sequence (breaks up structured patterns, improves convergence)
+# - aka. randomization
+# - rds commonly used, easy to implement
+# - Owen-scrambling (aka. Nested Uniform Scrambling) better, can actually improve convergence rate!
+# - applies permutations to the elementary intervals of the output domain
+# - Just scrambling not enough when padding (sequences will still be quite correlated)
+
+# Global samplers:
+# - use a single sequence over the image plane in rendering
+# - does not mean that pixels have to be rendered in a LDS order!
+#   => if the sequence supports skipping, then pixels can still be processed in an arbitrary order
+# - might leave artifacts in the image plane
+
+# Sample decorrelation:
+# - Shufflig (e.g. Owen): works well
+# - Random sample offsetting: might be slow, depending on sampler
+# - Cranley-patterson rotation: increases variance
+
 BIG_PRIME = 15487313
 
-#import burley2020
-from sobol import i64, i32, hash, sobol_float, sobol_float_rds, sobol_float_owen
+from sobol import i32, hash, hash_combine, sobol, sobol_owen, sobol_rds
 
 def seeded_randint(seed):
     return np.random.RandomState(seed=seed).randint(0, 1<<63, dtype=np.uint64).item()
 
 def seeded_rand(seed):
     return np.random.RandomState(seed=seed).rand()
-
-# TODO: 64-bit version?
-# Somewhat similar to boost::hash_combine
-def hash_combine(hash: int, v: int) -> int:
-    return i32(hash ^ (v + (hash << 6) + (hash >> 2)))
 
 def hash_combine_naive(hash: int, v: int) -> int:
     return i32(hash + BIG_PRIME * v)
@@ -70,14 +103,6 @@ def radical_inverse(b: int, i: int):
 def cranley_patterson_rotation(v, dim, seed):
     return (v + seeded_rand(hash_combine(seed, hash(dim)))) % 1
 
-# Reinterpret float bits as int
-def float_as_int(a: float):
-    return struct.unpack('@Q', struct.pack('@d', a))[0]
-
-# Reinterpret int bits as float
-def int_as_float(a: int):
-    return struct.unpack('@d', struct.pack('@Q', a))[0]
-
 def halton(i: int, dim: int, seed: int = 0):
     if seed:
         raise NotImplementedError()
@@ -103,18 +128,14 @@ def sobol_cpp_impl(variant: str, i: int, dim: int, seed: int = 0):
         _sobol_cache[key] = burley2020.sample(variant, n=n_samp, dim=dim, seed=seed) # scramble seed?
     return _sobol_cache[key][i]
 
-def sobol_owen(*args, **kwargs):
+def sobol_owen_cpp(*args, **kwargs):
     return sobol_cpp_impl('sobol_owen', *args, **kwargs)
 
-def sobol_rds(*args, **kwargs):
+def sobol_rds_cpp(*args, **kwargs):
     return sobol_cpp_impl('sobol_rds', *args, **kwargs)
 
 def sobol_cp(i: int, dim: int, seed: int):
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
-
-# No scrambling or permutation?
-def sobol(i: int, dim: int, seed: int = 0):
-    return sobol_float(i, dim, seed) # matches c++ version
 
 def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
     if func.__name__ == 'hammersley':
@@ -129,58 +150,9 @@ def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
 
 if __name__ == '__main__':
     pass
-    import burley2020
-    plot_2d(sobol_float_owen, 0, 1, seed=1)
-    plot_2d(sobol_owen, 0, 1, seed=1)
-    plot_2d(sobol_float_owen, 3, 4, seed=123)
-    plot_2d(sobol_owen, 3, 4, seed=123)
-    plot_2d(sobol_float_rds, 0, 1, seed=1)
-    plot_2d(sobol_rds, 0, 1, seed=1)
-    plot_2d(sobol_float_rds, 3, 4, seed=123)
-    plot_2d(sobol_rds, 3, 4, seed=123)
-    
-    #plot_2d(hammersley, 0, 1, seed=0)
-    #plot_2d(halton, 0, 1, seed=0)
-    #plot_2d(sobol, 0, 1, seed=12345)
-    #plot_2d(sobol_float_owen, 0, 1, seed=12345)
-    
+    plot_2d(hammersley, 0, 1, seed=0)
+    plot_2d(halton, 0, 1, seed=0)
+    plot_2d(sobol, 0, 1, seed=0)
+    plot_2d(sobol_rds, 0, 1, seed=0)
+    plot_2d(sobol_owen, 0, 1, seed=0)
     print('Done')
-
-# Want to optimize for:
-# - low multidimensional discrepancy
-# - high minimum sample distance
-# - efficient computation (preferably in base-2)
-# - random access
-
-# Sobol:
-# - Implements 1D-stratification-preserving permutations of the binary van der Corput sequence
-#   => achieved through nested binary permutations
-#   => LK-hashing also preserves 1D stratification (for all sample counts)
-# - Additionally, the permutaitons are chosen to minimize multidimensional discrepancy
-# - Permutations are stored as a matrix of 'direction numbers'
-
-# Shuffling (randomize index): creates uncorrelated variants of given low-discrepancy sequence
-# - Decorrelates the ordering of samples for padding without changing other poperties
-# - used to stich several sequences together along the dimension axis
-#   => avoids high-dim sequences, which have large sample count requirements for favorable convergence [5, sec. 2.3]
-# - implements padding, which can also be done with pure random noise
-# - Can be implemented using Owen shuffling (!= Owen scrambling)
-
-# Scrambling (randomize value): introduces randomness into QMC sequence
-# - Improves properties of the sequence (breaks up structured patterns, improves convergence)
-# - aka. randomization
-# - rds commonly used, easy to implement
-# - Owen-scrambling (aka. Nested Uniform Scrambling) better, can actually improve convergence rate!
-# - applies permutations to the elementary intervals of the output domain
-# - Just scrambling not enough when padding (sequences will still be quite correlated)
-
-# Global samplers:
-# - use a single sequence over the image plane in rendering
-# - does not mean that pixels have to be rendered in a LDS order!
-#   => if the sequence supports skipping, then pixels can still be processed in an arbitrary order
-# - might leave artifacts in the image plane
-
-# Sample decorrelation:
-# - Shufflig (e.g. Owen): works well
-# - Random sample offsetting: might be slow, depending on sampler
-# - Cranley-patterson rotation: increases variance
