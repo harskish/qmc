@@ -1,6 +1,6 @@
 from pathlib import Path
 from pyviewer.custom_ops import get_plugin
-plugin = get_plugin('burley2020ext', ('main.cpp', 'genpoints.cpp', 'faure05.cpp', 'sobol.cpp'), Path(__file__).parent)
+plugin = get_plugin('burley2020ext', ('main.cpp', 'genpoints.cpp', 'faure05.cpp', 'sobol.cpp'), Path(__file__).parent, ldflags=(), cuda=False)
 
 # -O3 -std=c++11 -fPIC -I .
 
