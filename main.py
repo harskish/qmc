@@ -13,34 +13,15 @@ import struct
 # [5]: jcgt.org/published/0009/04/01/
 
 BIG_PRIME = 15487313
-MASK_32BIT = 0xffffffff; assert MASK_32BIT.bit_length() == 32
-MASK_64BIT = 0xffffffffffffffff; assert MASK_64BIT.bit_length() == 64
 
-import burley2020
-
-# Explicitly truncate to 64bits
-# Python has no unsigned integer datatype
-def i64(v: int):
-    return v & MASK_64BIT
-
-def i32(v: int):
-    return v & MASK_32BIT
+#import burley2020
+from sobol import i64, i32, hash, sobol_float, sobol_float_rds, sobol_float_owen
 
 def seeded_randint(seed):
     return np.random.RandomState(seed=seed).randint(0, 1<<63, dtype=np.uint64).item()
 
 def seeded_rand(seed):
     return np.random.RandomState(seed=seed).rand()
-
-# TODO: u64 version?
-def hash(x: int):
-    # finalizer from murmurhash3
-    x = i32(x ^ (x >> 16))
-    x = i32(x * (0x85ebca6b))
-    x = i32(x ^ (x >> 13))
-    x = i32(x * (0xc2b2ae35))
-    x = i32(x ^ (x >> 16))
-    return x
 
 # TODO: 64-bit version?
 # Somewhat similar to boost::hash_combine
@@ -97,29 +78,28 @@ def float_as_int(a: float):
 def int_as_float(a: int):
     return struct.unpack('@d', struct.pack('@Q', a))[0]
 
-def halton(dim: int, i: int, N: int = None, seed: int = None):
-    _ = N # ignored
+def halton(i: int, dim: int, seed: int = 0):
     if seed:
         raise NotImplementedError()
     b = nth_prime(dim)
     return radical_inverse(b, i) # include zero [3,4]
 
-def hammersley(dim: int, i: int, N: int, seed: int = None):
+def hammersley(i: int, dim: int, N: int, seed: int = 0):
     if seed:
         raise NotImplementedError()
     if dim == 0:
         return i / N
-    return halton(dim - 1, i)
+    return halton(i, dim - 1)
 
 # Getting favorable convergence with high-dimensional Sobol sequences requires huge sample counts (Burley2020 sec. 2.3)
 # => instead use low-dimensional 4D sequence, pad with shuffled RQMC point sets (here: Owen-shuffled)
 _sobol_cache = defaultdict(list)
-def sobol_impl(variant: str, dim: int, i: int, N: int, seed: int = None):
+def sobol_impl(variant: str, i: int, dim: int, seed: int = 0):
     global _sobol_cache
-    seed = seed or 0
     key = f'{variant}_{dim}_{seed}'
     if len(_sobol_cache[key]) < i+1:
-        n_samp = max(N, 2*len(_sobol_cache[key]))
+        import burley2020
+        n_samp = max(i+1, 2*len(_sobol_cache[key]))
         _sobol_cache[key] = burley2020.sample(variant, n=n_samp, dim=dim, seed=seed) # scramble seed?
     return _sobol_cache[key][i]
 
@@ -129,65 +109,40 @@ def sobol_owen(*args, **kwargs):
 def sobol_rds(*args, **kwargs):
     return sobol_impl('sobol_rds', *args, **kwargs)
 
+def sobol_cp(i: int, dim: int, seed: int):
+    return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
+
 # No scrambling or permutation?
-def sobol(*args, **kwargs):
-    return sobol_impl('sobol', *args, **kwargs)
+def sobol(i: int, dim: int, seed: int = 0):
+    return sobol_float(i, dim, seed) # matches c++ version
 
-def uber_sampler(
-    func: Callable, # qmc sampler funcion
-    dim: int,
-    i: int,
-    seed: int = 0, # scrambling/permutation seed (rds, Owen)
-    cp_seed: int = None, # Cranley-Patterson rotation
-    N: int = None,
-):
-    v = func(dim, i, N, seed)
-    if cp_seed is not None:
-        v = cranley_patterson_rotation(v, dim, cp_seed)
-    return v
-
-def plot_2d(func, b1, b2, *args, N=256, **kwargs):
-    xs = [uber_sampler(func, b1, i, *args, **kwargs, N=N) for i in range(N)]
-    ys = [uber_sampler(func, b2, i, *args, **kwargs, N=N) for i in range(N)]
+def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
+    if func.__name__ == 'hammersley':
+        kwargs['N'] = N
+    xs = [func(i, dim1, *args, **kwargs) for i in range(N)]
+    ys = [func(i, dim2, *args, **kwargs) for i in range(N)]
     plt.figure(figsize=(6, 6))
     plt.plot(xs, ys, 'bo')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
-    plt.title(
-        f'{func.__name__} dims=({b1},{b2})\n' + 
-        f"cp{kwargs.get('cp_seed', '-none')}, rds{kwargs.get('rds_seed', '-none')}, owen{kwargs.get('owen_seed', '-none')}"
-    )
-
-def plot_2d_broken(func, b1, b2, *args, N=256, **kwargs):
-    # Intentionally misuse generator (consecutive bases, sample indiceds {b1,b2})
-    xs = [uber_sampler(func, i, b1, *args, **kwargs, N=N) for i in range(N)]
-    ys = [uber_sampler(func, i, b2, *args, **kwargs, N=N) for i in range(N)]
-    plt.figure(figsize=(6, 6))
-    plt.plot(xs, ys, 'bo')
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.title(
-        f'Broken-{func.__name__} dims=({b1},{b2})\n' + 
-        f"cp{kwargs.get('cp_seed', '-none')}, seed{kwargs.get('seed', '-none')}"
-    )
+    plt.title(f'{func.__name__} dims=({dim1},{dim2})\nseed{kwargs.get("seed", 0)}')
 
 if __name__ == '__main__':
-    plot_2d(sobol_owen, 0, 1, seed=0)
-    plot_2d(sobol_owen, 0, 2, seed=0)
-    plot_2d(sobol_owen, 1, 2, seed=0)
-    plot_2d(sobol_owen, 0, 3, seed=0)
-    plot_2d(sobol_owen, 1, 3, seed=0)
-    plot_2d(sobol_owen, 2, 3, seed=0)
-    #plot_2d(sobol_owen, 0, 1, seed=0, cp_seed=0)
-    #plot_2d(sobol_owen, 0, 1, seed=1)
-    #plot_2d(sobol_rds, 0, 1, seed=0)
-    #plot_2d(sobol_rds, 0, 1, seed=1)
-    #plot_2d(sobol, 0, 1)
-    #plot_2d(halton, 0, 1)
-    #plot_2d(hammersley, 0, 1)
-    ##plot_2d(hammersley, 0, 1, cp_seed=0)
-    #plot_2d_broken(halton, 1, 2)
-    plt.show()
+    pass
+    plot_2d(sobol_float_owen, 0, 1, seed=1)
+    plot_2d(sobol_owen, 0, 1, seed=1)
+    plot_2d(sobol_float_owen, 3, 4, seed=123)
+    plot_2d(sobol_owen, 3, 4, seed=123)
+    plot_2d(sobol_float_rds, 0, 1, seed=1)
+    plot_2d(sobol_rds, 0, 1, seed=1)
+    plot_2d(sobol_float_rds, 3, 4, seed=123)
+    plot_2d(sobol_rds, 3, 4, seed=123)
+    
+    #plot_2d(hammersley, 0, 1, seed=0)
+    #plot_2d(halton, 0, 1, seed=0)
+    #plot_2d(sobol, 0, 1, seed=12345)
+    #plot_2d(sobol_float_owen, 0, 1, seed=12345)
+    
     print('Done')
 
 # Want to optimize for:
