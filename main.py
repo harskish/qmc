@@ -94,7 +94,7 @@ def hammersley(i: int, dim: int, N: int, seed: int = 0):
 # Getting favorable convergence with high-dimensional Sobol sequences requires huge sample counts (Burley2020 sec. 2.3)
 # => instead use low-dimensional 4D sequence, pad with shuffled RQMC point sets (here: Owen-shuffled)
 _sobol_cache = defaultdict(list)
-def sobol_impl(variant: str, i: int, dim: int, seed: int = 0):
+def sobol_cpp_impl(variant: str, i: int, dim: int, seed: int = 0):
     global _sobol_cache
     key = f'{variant}_{dim}_{seed}'
     if len(_sobol_cache[key]) < i+1:
@@ -104,10 +104,10 @@ def sobol_impl(variant: str, i: int, dim: int, seed: int = 0):
     return _sobol_cache[key][i]
 
 def sobol_owen(*args, **kwargs):
-    return sobol_impl('sobol_owen', *args, **kwargs)
+    return sobol_cpp_impl('sobol_owen', *args, **kwargs)
 
 def sobol_rds(*args, **kwargs):
-    return sobol_impl('sobol_rds', *args, **kwargs)
+    return sobol_cpp_impl('sobol_rds', *args, **kwargs)
 
 def sobol_cp(i: int, dim: int, seed: int):
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
@@ -129,6 +129,7 @@ def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
 
 if __name__ == '__main__':
     pass
+    import burley2020
     plot_2d(sobol_float_owen, 0, 1, seed=1)
     plot_2d(sobol_owen, 0, 1, seed=1)
     plot_2d(sobol_float_owen, 3, 4, seed=123)

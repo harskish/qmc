@@ -1,4 +1,3 @@
-# uint32_t directions[5][32]
 directions = [
     [
         0x80000000, 0x40000000, 0x20000000, 0x10000000,
@@ -64,63 +63,41 @@ def i64(v: int):
 def i32(v: int):
     return v & MASK_32BIT
 
-# inline uint32_t hash_combine(uint32_t seed, uint32_t v) {
-#   return seed ^ (v + (seed << 6) + (seed >> 2));
-# }
-
-# TODO: 64-bit version?
 # Somewhat similar to boost::hash_combine
 def hash_combine(seed: int, v: int) -> int:
-    assert seed.bit_length() <= 32
-    return seed ^ i32(v + i32(seed << 6) + i32(seed >> 2))
+    return i32(seed ^ (v + (seed << 6) + (seed >> 2)))
 
 def hash(x: int):
     # finalizer from murmurhash3
-    x = i32(x ^ i32(x >> 16))
-    x = i32(x * i32(0x85ebca6b))
-    x = i32(x ^ i32(x >> 13))
-    x = i32(x * i32(0xc2b2ae35))
-    x = i32(x ^ i32(x >> 16))
-    assert x.bit_length() <= 32
+    x = i32(x)
+    x = x ^ (x >> 16)
+    x = i32(x * 0x85ebca6b)
+    x = x ^ (x >> 13)
+    x = i32(x * 0xc2b2ae35)
+    x = x ^ (x >> 16)
     return x
 
 def reverse_bits(x: int) -> int:
-    assert x.bit_length() <= 32
     x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1))
-    assert x.bit_length() <= 32
     x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2))
-    assert x.bit_length() <= 32
     x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4))
-    assert x.bit_length() <= 32
     x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8))
-    assert x.bit_length() <= 32
-    
-    ret = (i32(x >> 16) | i32(x << 16))
-    assert ret.bit_length() <= 32
-    return ret
+    return i32((x >> 16) | (x << 16))
 
-# Improved LK variant by Nathan Vegdahl (psychopath.io/post/2021_01_30_building_a_better_lk_hash)
+# Improved LK variant by Nathan Vegdahl:
+# psychopath.io/post/2021_01_30_building_a_better_lk_hash
 def vegdahl_permutation(x, seed):
-    x = i32(x ^ i32(x * 0x3d20adea))
-    assert x.bit_length() <= 32
-    x = i32(x + (seed))
-    assert x.bit_length() <= 32
-    x = i32(x * i32((seed >> 16) | 1))
-    assert x.bit_length() <= 32
-    x = i32(x ^ i32(x * 0x05526c56))
-    assert x.bit_length() <= 32
-    x = i32(x ^ i32(x * 0x53a22864))
-    assert x.bit_length() <= 32
-    return x
+    x ^= x * 0x3d20adea
+    x += seed
+    x *= (seed >> 16) | 1
+    x ^= x * 0x05526c56
+    x ^= x * 0x53a22864
+    return i32(x)
 
 def nested_uniform_scramble_base2(x, seed):
     x = reverse_bits(x)
-    assert x.bit_length() <= 32
-    #x = laine_karras_permutation(x, seed);
-    x = vegdahl_permutation(x, seed)
-    assert x.bit_length() <= 32
+    x = vegdahl_permutation(x, seed) # laine_karras_permutation(x, seed);
     x = reverse_bits(x)
-    assert x.bit_length() <= 32
     return x
 
 def sobol(index: int, dim: int) -> int:
@@ -129,23 +106,6 @@ def sobol(index: int, dim: int) -> int:
     for bit in range(32):
         mask = (index >> bit) & 1
         X ^= mask * directions[dim][bit]
-
-    assert X.bit_length() <= 32
-    return X
-
-def sobol4d(index: int) -> list[int]:
-    X = [0, 0, 0, 0]
-    for dim in range(4):
-        for bit in range(32):
-            mask = (index >> bit) & 1
-            X[dim] ^= mask * directions[dim][bit]
-    return X
-
-def shuffled_scrambled_sobol4d(index, seed):
-    index = nested_uniform_scramble_base2(index, seed)
-    X = sobol4d(index)
-    for i in range(4):
-        X[i] = nested_uniform_scramble_base2(X[i], hash_combine(seed, i))
     return X
 
 def sobol_float(index: int, dim: int, seed: int = 0) -> float:
@@ -155,7 +115,6 @@ def sobol_float(index: int, dim: int, seed: int = 0) -> float:
 def sobol_float_rds(i, dim, seed=0) -> float:
     seed = hash(seed)
     scramble = hash_combine(seed, hash(dim))
-    assert scramble.bit_length() <= 32
     return (sobol(i,dim) ^ scramble) * SOBOL_SCALE_32BIT
 
 def sobol_float_owen(i, dim, seed=0) -> float:
