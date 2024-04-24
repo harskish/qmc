@@ -102,7 +102,7 @@ def build_matrix(poly, vinit, bits=32, dims=1111):
         print('Warning: property A only holds for first 1111 dimensions')
 
     # first row of v is all 1s
-    v[0, :] = 123
+    v[0, :] = 1
 
     # Remaining rows of v (row 2 through dim, indexed by [1:dim])
     for d in trange(1, dims):

@@ -1,8 +1,8 @@
 from pathlib import Path
 from .direction_numbers import get_direction_numbers, get_burley_direction_numbers
 
-#directions = get_direction_numbers(dims=5)
-directions = get_burley_direction_numbers()
+directions = get_direction_numbers(dims=5)
+#directions = get_burley_direction_numbers()
 
 MASK_32BIT = 0xffffffff
 MASK_64BIT = 0xffffffffffffffff
