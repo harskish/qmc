@@ -137,12 +137,12 @@ def sobol_rds_cpp(*args, **kwargs):
 def sobol_cp(i: int, dim: int, seed: int):
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
 
-def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
+def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
     if func.__name__ == 'hammersley':
         kwargs['N'] = N
     xs = [func(i, dim1, *args, **kwargs) for i in range(N)]
     ys = [func(i, dim2, *args, **kwargs) for i in range(N)]
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(8, 8))
     plt.plot(xs, ys, 'bo')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
@@ -150,9 +150,22 @@ def plot_2d(func, dim1, dim2, *args, N=256, **kwargs):
 
 if __name__ == '__main__':
     pass
-    plot_2d(hammersley, 0, 1, seed=0)
-    plot_2d(halton, 0, 1, seed=0)
-    plot_2d(sobol, 0, 1, seed=0)
-    plot_2d(sobol_rds, 0, 1, seed=0)
-    plot_2d(sobol_owen, 0, 1, seed=0)
+    #plot_2d(sobol, 0, 1, seed=0)
+    #plot_2d(sobol, 1, 2, seed=0)
+    #plot_2d(sobol, 0, 4, seed=0)
+    #plot_2d(sobol_rds, 0, 1, seed=0)
+    #plot_2d(sobol_rds, 0, 1, seed=123)
+    #plot_2d(sobol_rds, 0, 1, seed=999)
+    #plot_2d(sobol_owen, 0, 1, seed=0)
+    #plot_2d(sobol_owen, 0, 1, seed=123)
+    #plot_2d(sobol_owen, 0, 1, seed=999)
+    #plot_2d(halton, 0, 1, seed=0)
+    #for i in range(0, 20):
+    #    plot_2d(hammersley, 0, i+1, seed=0)
+    #for i in range(0, 20):
+    #    plot_2d(hammersley, i, i+1, seed=0)
+    for i in range(0, 4):
+        plot_2d(sobol, i, i+1, seed=0)
+    for i in range(0, 4):
+        plot_2d(sobol_owen, i, i+1, seed=0)
     print('Done')
