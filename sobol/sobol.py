@@ -1,7 +1,7 @@
 from pathlib import Path
 from .direction_numbers import get_direction_numbers, get_burley_direction_numbers
 
-directions = get_direction_numbers(dims=5)
+directions = get_direction_numbers(dims=100)
 #directions = get_burley_direction_numbers()
 
 MASK_32BIT = 0xffffffff
@@ -54,7 +54,7 @@ def nested_uniform_scramble_base2(x, seed):
     return x
 
 def sobol_int(index: int, dim: int) -> int:
-    assert dim <= 4
+    assert dim < len(directions)
     X = 0
     for bit in range(32):
         mask = (index >> bit) & 1
