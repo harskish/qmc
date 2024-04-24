@@ -97,7 +97,8 @@ def convert_direction_numbers(outfile):
 # github.com/scipy/scipy/blob/8431e12346ac9564e244bfce920dc8a04bcabbd9/scipy/stats/_sobol.pyx#L241
 def build_matrix(poly, vinit, bits=32, dims=1111):
     assert 0 < dims <= vinit.shape[0]
-    v = np.zeros((dims, bits), dtype={32: np.uint32, 64: np.uint64}[bits])
+    dtype = {32: np.uint32, 64: np.uint64}[bits]
+    v = np.zeros((dims, bits), dtype=dtype)
     if dims > 1111:
         print('Warning: property A only holds for first 1111 dimensions')
 
@@ -129,11 +130,7 @@ def build_matrix(poly, vinit, bits=32, dims=1111):
 
     # Multiply each column of v by power of 2:
     # v * [2^(bits-1), 2^(bits-2),..., 2, 1]
-    pow2 = 1
-    for d in range(bits):
-        for i in range(dims):
-            v[i, bits - 1 - d] *= pow2
-        pow2 = pow2 << 1
+    v *= 2**np.arange(bits, dtype=dtype)[::-1]
     
     return v.tolist()
 

@@ -164,11 +164,11 @@ if __name__ == '__main__':
     #    plot_2d(hammersley, 0, i+1, seed=0)
     #for i in range(0, 20):
     #    plot_2d(hammersley, i, i+1, seed=0)
-    plot_2d(sobol_owen, 14, 15, seed=0)
-    plot_2d(sobol_owen, 14, 15, seed=1)
-    plot_2d(sobol_owen, 14, 15, seed=2)
-    plot_2d(sobol_owen, 14, 15, seed=3)
-    plot_2d(sobol_owen, 14, 15, seed=4)
+    #plot_2d(sobol_owen, 14, 15, seed=0)
+    #plot_2d(sobol_owen, 14, 15, seed=1)
+    #plot_2d(sobol_owen, 14, 15, seed=2)
+    #plot_2d(sobol_owen, 14, 15, seed=3)
+    #plot_2d(sobol_owen, 14, 15, seed=4)
     
     for i in range(0, 15):
         plot_2d(sobol, i, i+1, seed=0)
