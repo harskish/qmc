@@ -61,16 +61,19 @@ def sobol_int(index: int, dim: int) -> int:
         X ^= mask * directions[dim][bit]
     return X
 
-def sobol(index, dim, seed=0) -> float:
+def sobol(index, dim, seed=0, N=None) -> float:
     _ = seed
+    _ = N
     return sobol_int(index, dim) * SOBOL_SCALE_32BIT
 
-def sobol_rds(i, dim, seed=0) -> float:
+def sobol_rds(i, dim, seed=0, N=None) -> float:
+    _ = N
     seed = hash(seed)
     scramble = hash_combine(seed, hash(dim))
     return (sobol_int(i,dim) ^ scramble) * SOBOL_SCALE_32BIT
 
-def sobol_owen(i, dim, seed=0) -> float:
+def sobol_owen(i, dim, seed=0, N=None) -> float:
+    _ = N
     seed = hash(seed)
     index = nested_uniform_scramble_base2(i, seed)
     return nested_uniform_scramble_base2(sobol_int(index, dim), hash_combine(seed, dim)) * SOBOL_SCALE_32BIT

@@ -1,10 +1,13 @@
 from collections import defaultdict
-from typing import Callable
 import numpy as np
 from math import sqrt
 from functools import lru_cache
 import matplotlib.pyplot as plt
-import struct
+import glfw
+import array
+from pyviewer.toolbar_viewer import AutoUIViewer
+from pyviewer.params import *
+from pyviewer import plot as implot
 
 # [1]: pbr-book.org/3ed-2018/Sampling_and_Reconstruction/The_Halton_Sampler
 # [2]: psychopath.io/post/2020_04_14_building_a_sobol_sampler
@@ -103,15 +106,12 @@ def radical_inverse(b: int, i: int):
 def cranley_patterson_rotation(v, dim, seed):
     return (v + seeded_rand(hash_combine(seed, hash(dim)))) % 1
 
-def halton(i: int, dim: int, seed: int = 0):
-    if seed:
-        raise NotImplementedError()
+def halton(i: int, dim: int, seed: int = 0, N: int = None):
+    _ = N
     b = nth_prime(dim)
     return radical_inverse(b, i) # include zero [3,4]
 
 def hammersley(i: int, dim: int, N: int, seed: int = 0):
-    if seed:
-        raise NotImplementedError()
     if dim == 0:
         return i / N
     return halton(i, dim - 1)
@@ -134,44 +134,54 @@ def sobol_owen_cpp(*args, **kwargs):
 def sobol_rds_cpp(*args, **kwargs):
     return sobol_cpp_impl('sobol_rds', *args, **kwargs)
 
-def sobol_cp(i: int, dim: int, seed: int):
+def sobol_cp(i: int, dim: int, seed: int, N: int):
+    _ = N
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
 
 def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
+    global fig
     if func.__name__ == 'hammersley':
         kwargs['N'] = N
     xs = [func(i, dim1, *args, **kwargs) for i in range(N)]
     ys = [func(i, dim2, *args, **kwargs) for i in range(N)]
-    plt.figure(figsize=(8, 8))
     plt.plot(xs, ys, 'bo')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.title(f'{func.__name__} dims=({dim1},{dim2})\nseed{kwargs.get("seed", 0)}')
+    return fig
+
+def toarr(a: list):
+    return array.array('f', a)
+
+@strict_dataclass
+class State(ParamContainer):
+    N: Param = IntParam('Samples', 128, 1, 2048)
+    seq: Param = EnumSliderParam('Sequence', halton,
+        [sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton], lambda f: f.__name__)
+    #randomize: Param = BoolParam('Randomize', True)
+    seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
+    dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
+    dim2: Param = IntParam('Dimension 2', 30, 0, 50, buttons=True)
+    
+class Viewer(AutoUIViewer):
+    def setup_state(self):
+        self.state = State()
+    
+    def draw_pre(self):
+        W, H = glfw.get_window_size(self.v._window)
+        style = imgui.get_style()
+        avail_h = H - self.menu_bar_height - 2*style.window_padding.y
+        plot_side = min(avail_h, W)
+
+        state = self.state
+        xs = [state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)]
+        ys = [state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)]
+        #implot.set_next_line_style()
+        #implot.set_next_fill_style()
+        implot.set_next_marker_style(size=7*self.ui_scale)
+        implot.begin_plot('LDS', size=(plot_side, plot_side))
+        implot.plot_scatter2('Sequence', toarr(xs), toarr(ys), len(xs))
+        implot.end_plot()
 
 if __name__ == '__main__':
-    pass
-    #plot_2d(sobol, 0, 1, seed=0)
-    #plot_2d(sobol, 1, 2, seed=0)
-    #plot_2d(sobol, 0, 4, seed=0)
-    #plot_2d(sobol_rds, 0, 1, seed=0)
-    #plot_2d(sobol_rds, 0, 1, seed=123)
-    #plot_2d(sobol_rds, 0, 1, seed=999)
-    #plot_2d(sobol_owen, 0, 1, seed=0)
-    #plot_2d(sobol_owen, 0, 1, seed=123)
-    #plot_2d(sobol_owen, 0, 1, seed=999)
-    #plot_2d(halton, 0, 1, seed=0)
-    #for i in range(0, 20):
-    #    plot_2d(hammersley, 0, i+1, seed=0)
-    #for i in range(0, 20):
-    #    plot_2d(hammersley, i, i+1, seed=0)
-    #plot_2d(sobol_owen, 14, 15, seed=0)
-    #plot_2d(sobol_owen, 14, 15, seed=1)
-    #plot_2d(sobol_owen, 14, 15, seed=2)
-    #plot_2d(sobol_owen, 14, 15, seed=3)
-    #plot_2d(sobol_owen, 14, 15, seed=4)
-    
-    for i in range(0, 15):
-        plot_2d(sobol, i, i+1, seed=0)
-    for i in range(0, 15):
-        plot_2d(sobol_owen, i, i+1, seed=0)
-    print('Done')
+    viewer = Viewer('LDS viewer')
