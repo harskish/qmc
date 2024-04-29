@@ -56,7 +56,7 @@ from pyviewer import plot as implot
 
 BIG_PRIME = 15487313
 
-from sobol import i32, hash, hash_combine, sobol, sobol_owen, sobol_rds
+from sobol import *
 
 def seeded_randint(seed):
     return np.random.RandomState(seed=seed).randint(0, 1<<63, dtype=np.uint64).item()
@@ -100,11 +100,15 @@ def radical_inverse(b: int, i: int):
         i = i // b
     return r
 
+@lru_cache
+def cranley_patterson_offset(dim, seed):
+    return seeded_rand(hash_combine(seed, hash(dim)))
+
 # Used to create decorrelated sample sequences.
 # Increases variance (see [2]).
 # Computes {p_i + s | mod 1} for all i.
 def cranley_patterson_rotation(v, dim, seed):
-    return (v + seeded_rand(hash_combine(seed, hash(dim)))) % 1
+    return (v + cranley_patterson_offset(dim, seed)) % 1
 
 def halton(i: int, dim: int, seed: int = 0, N: int = None):
     _ = N
@@ -119,7 +123,7 @@ def hammersley(i: int, dim: int, N: int, seed: int = 0):
 # Getting favorable convergence with high-dimensional Sobol sequences requires huge sample counts (Burley2020 sec. 2.3)
 # => instead use low-dimensional 4D sequence, pad with shuffled RQMC point sets (here: Owen-shuffled)
 _sobol_cache = defaultdict(list)
-def sobol_cpp_impl(variant: str, i: int, dim: int, seed: int = 0):
+def sobol_cpp_impl(variant: str, i: int, dim: int, seed: int = 0, N: int = None):
     global _sobol_cache
     key = f'{variant}_{dim}_{seed}'
     if len(_sobol_cache[key]) < i+1:
@@ -137,6 +141,12 @@ def sobol_rds_cpp(*args, **kwargs):
 def sobol_cp(i: int, dim: int, seed: int, N: int):
     _ = N
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
+
+def random(i: int, dim: int, seed: int, N: int):
+    return seeded_rand(hash_combine(i, hash_combine(dim, seed)))
+
+def murmur(i: int, dim: int, seed: int, N: int):
+    return hash(hash_combine(i, hash_combine(dim, seed))) * ONE_OVER_U32_MAX
 
 def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
     global fig
@@ -157,7 +167,7 @@ def toarr(a: list):
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
     seq: Param = EnumSliderParam('Sequence', halton,
-        [sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton], lambda f: f.__name__)
+        [murmur, sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton], lambda f: f.__name__)
     #randomize: Param = BoolParam('Randomize', True)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
@@ -168,17 +178,15 @@ class Viewer(AutoUIViewer):
         self.state = State()
     
     def draw_pre(self):
+        state = self.state
         W, H = glfw.get_window_size(self.v._window)
         style = imgui.get_style()
         avail_h = H - self.menu_bar_height - 2*style.window_padding.y
-        plot_side = min(avail_h, W)
-
-        state = self.state
+        avail_w = W - self.toolbar_width
+        plot_side = min(avail_h, avail_w)
         xs = [state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)]
         ys = [state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)]
-        #implot.set_next_line_style()
-        #implot.set_next_fill_style()
-        implot.set_next_marker_style(size=7*self.ui_scale)
+        implot.set_next_marker_style(size=6*self.ui_scale)
         implot.begin_plot('LDS', size=(plot_side, plot_side))
         implot.plot_scatter2('Sequence', toarr(xs), toarr(ys), len(xs))
         implot.end_plot()

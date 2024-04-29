@@ -6,7 +6,7 @@ directions = get_direction_numbers(dims=100)
 
 MASK_32BIT = 0xffffffff
 MASK_64BIT = 0xffffffffffffffff
-SOBOL_SCALE_32BIT = 1.0/(1<<32)
+ONE_OVER_U32_MAX = 1.0/(1<<32)
 
 # Explicitly truncate to 64bits
 # Python has no unsigned integer datatype
@@ -53,6 +53,16 @@ def nested_uniform_scramble_base2(x, seed):
     x = reverse_bits(x)
     return x
 
+# "Ground truth" Owen scrambling
+def owen_scramble_reference(n: int, seed: int) -> int:
+    in_bits = n
+    out_bits = n
+    for bit in range(32):
+        high_mask = ~(1 << bit)
+        hashed = hash_combine(hash(in_bits & high_mask), seed) # seed already hashed
+        out_bits ^= hashed & (1 << bit)
+    return out_bits
+
 def sobol_int(index: int, dim: int) -> int:
     assert dim < len(directions)
     X = 0
@@ -64,16 +74,22 @@ def sobol_int(index: int, dim: int) -> int:
 def sobol(index, dim, seed=0, N=None) -> float:
     _ = seed
     _ = N
-    return sobol_int(index, dim) * SOBOL_SCALE_32BIT
+    return sobol_int(index, dim) * ONE_OVER_U32_MAX
 
 def sobol_rds(i, dim, seed=0, N=None) -> float:
     _ = N
     seed = hash(seed)
     scramble = hash_combine(seed, hash(dim))
-    return (sobol_int(i,dim) ^ scramble) * SOBOL_SCALE_32BIT
+    return (sobol_int(i,dim) ^ scramble) * ONE_OVER_U32_MAX
 
 def sobol_owen(i, dim, seed=0, N=None) -> float:
     _ = N
     seed = hash(seed)
     index = nested_uniform_scramble_base2(i, seed)
-    return nested_uniform_scramble_base2(sobol_int(index, dim), hash_combine(seed, dim)) * SOBOL_SCALE_32BIT
+    return nested_uniform_scramble_base2(sobol_int(index, dim), hash_combine(seed, dim)) * ONE_OVER_U32_MAX
+
+def sobol_owen_ref(i, dim, seed=0, N=None) -> float:
+    _ = N
+    seed = hash(seed)
+    index = owen_scramble_reference(i, seed)
+    return owen_scramble_reference(sobol_int(index, dim), hash_combine(seed, dim)) * ONE_OVER_U32_MAX
