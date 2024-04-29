@@ -115,6 +115,12 @@ def halton(i: int, dim: int, seed: int = 0, N: int = None):
     b = nth_prime(dim)
     return radical_inverse(b, i) # include zero [3,4]
 
+def leaped_halton(i: int, dim: int, seed: int = 0, N: int = None):
+    _ = N
+    b = nth_prime(dim)
+    leap = nth_prime(seed + 79) # start at 409
+    return radical_inverse(b, i*leap) # include zero [3,4]
+
 def hammersley(i: int, dim: int, N: int, seed: int = 0):
     if dim == 0:
         return i / N
@@ -167,7 +173,7 @@ def toarr(a: list):
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
     seq: Param = EnumSliderParam('Sequence', halton,
-        [murmur, sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton], lambda f: f.__name__)
+        [murmur, sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton, leaped_halton], lambda f: f.__name__)
     #randomize: Param = BoolParam('Randomize', True)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
