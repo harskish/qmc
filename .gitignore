@@ -1,4 +1,5 @@
 **/*.pyc
+**/.DS_Store
 **/__pycache__
 sobol/_sobol_direction_numbers.npz
 *.ini

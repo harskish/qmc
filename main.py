@@ -148,6 +148,14 @@ def sobol_cp(i: int, dim: int, seed: int, N: int):
     _ = N
     return cranley_patterson_rotation(sobol(i, dim, seed), dim, seed)
 
+def cascaded_sobol_online(i: int, dim: int, seed: int, N: int):
+    import paulin2021
+    return paulin2021.sample(i, dim, seed)
+
+def cascaded_sobol(i: int, dim: int, seed: int, N: int):
+    import paulin2021
+    return paulin2021.sample_ref(i, dim, seed)
+
 def random(i: int, dim: int, seed: int, N: int):
     return seeded_rand(hash_combine(i, hash_combine(dim, seed)))
 
@@ -172,9 +180,11 @@ def toarr(a: list):
 @strict_dataclass
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
-    seq: Param = EnumSliderParam('Sequence', halton,
-        [murmur, sobol, sobol_cp, sobol_owen, sobol_rds, hammersley, halton, leaped_halton], lambda f: f.__name__)
-    #randomize: Param = BoolParam('Randomize', True)
+    seq: Param = EnumSliderParam('Sequence', cascaded_sobol, [
+        murmur, sobol, sobol_cp, sobol_rds,
+        sobol_owen, cascaded_sobol,
+        hammersley, halton, leaped_halton
+    ], lambda f: f.__name__)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
     dim2: Param = IntParam('Dimension 2', 30, 0, 50, buttons=True)
