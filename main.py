@@ -92,13 +92,13 @@ def get_primes(N):
     return [nth_prime(i) for i in range(N)]
 
 def radical_inverse(b: int, i: int):
-    f = 1
-    r = 0
-    while i > 0: # log_b(i) steps?
-        f = f / b
-        r += f * (i % b)
-        i = i // b
-    return r
+    exp = 1
+    rev = 0
+    while i > 0:
+        exp = exp / b # left of decimal => negative powers
+        rev += exp * (i % b) # lsd
+        i = i // b # next power of b
+    return rev
 
 @lru_cache
 def cranley_patterson_offset(dim, seed):
