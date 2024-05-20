@@ -100,6 +100,15 @@ def radical_inverse(b: int, i: int):
         i = i // b # next power of b
     return rev
 
+# Generalized golden ratio
+# d=1: golden ratio, d=2: plastic ratio
+@lru_cache
+def phi(d, iter=20):
+  x = 2.0
+  for _ in range(iter):
+    x = pow(1+x, 1/(d+1))
+  return x
+
 @lru_cache
 def cranley_patterson_offset(dim, seed):
     return seeded_rand(hash_combine(seed, hash(dim)))
@@ -125,6 +134,12 @@ def hammersley(i: int, dim: int, N: int, seed: int = 0):
     if dim == 0:
         return i / N
     return halton(i, dim - 1)
+
+# extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+def R2(i: int, dim: int, N: int, seed: int = 0):
+    max_dim = 2 # looks bad for higher values
+    p = pow(1/phi(max_dim), dim+1) % 1 # inverse power of plastic number
+    return cranley_patterson_rotation(p*i, dim, seed)
 
 # Getting favorable convergence with high-dimensional Sobol sequences requires huge sample counts (Burley2020 sec. 2.3)
 # => instead use low-dimensional 4D sequence, pad with shuffled RQMC point sets (here: Owen-shuffled)
@@ -180,14 +195,14 @@ def toarr(a: list):
 @strict_dataclass
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
-    seq: Param = EnumSliderParam('Sequence', cascaded_sobol, [
+    seq: Param = EnumSliderParam('Sequence', R2, [
         murmur, sobol, sobol_cp, sobol_rds,
         sobol_owen, cascaded_sobol,
-        hammersley, halton, leaped_halton
+        hammersley, halton, leaped_halton, R2,
     ], lambda f: f.__name__)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
-    dim2: Param = IntParam('Dimension 2', 30, 0, 50, buttons=True)
+    dim2: Param = IntParam('Dimension 2', 1, 0, 50, buttons=True)
     
 class Viewer(AutoUIViewer):
     def setup_state(self):
@@ -202,6 +217,7 @@ class Viewer(AutoUIViewer):
         plot_side = min(avail_h, avail_w)
         xs = [state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)]
         ys = [state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)]
+        implot.set_next_plot_limits(0, 1, 0, 1)
         implot.set_next_marker_style(size=6*self.ui_scale)
         implot.begin_plot('LDS', size=(plot_side, plot_side))
         implot.plot_scatter2('Sequence', toarr(xs), toarr(ys), len(xs))
