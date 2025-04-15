@@ -2,7 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 from pyviewer.custom_ops import get_plugin
 
-plugin = get_plugin('paulin2021ext', 'cascadedSobol.cpp', Path(__file__).parent, ldflags=(), cuda=False)
+plugin = get_plugin('paulin2021ext', 'cascadedSobol.cpp', Path(__file__).parent, ldflags=(), cuda=False, unsafe_load_prebuilt=True)
 data_dir = (Path(__file__).parent / "data/cascaded_sobol_init_tab.dat").as_posix()
 
 def sample(i: int, dim: int, seed: int, max_pts: int = 2048):

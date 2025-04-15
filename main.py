@@ -4,10 +4,12 @@ from math import sqrt
 from functools import lru_cache
 import matplotlib.pyplot as plt
 import glfw
-import array
+import pyviewer
 from pyviewer.toolbar_viewer import AutoUIViewer
 from pyviewer.params import *
-from pyviewer import plot as implot
+from imgui_bundle import implot
+
+assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 
 # [1]: pbr-book.org/3ed-2018/Sampling_and_Reconstruction/The_Halton_Sampler
 # [2]: psychopath.io/post/2020_04_14_building_a_sobol_sampler
@@ -189,9 +191,6 @@ def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
     plt.title(f'{func.__name__} dims=({dim1},{dim2})\nseed{kwargs.get("seed", 0)}')
     return fig
 
-def toarr(a: list):
-    return array.array('f', a)
-
 @strict_dataclass
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
@@ -215,13 +214,13 @@ class Viewer(AutoUIViewer):
         avail_h = H - self.menu_bar_height - 2*style.window_padding.y
         avail_w = W - self.toolbar_width
         plot_side = min(avail_h, avail_w)
-        xs = [state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)]
-        ys = [state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)]
-        implot.set_next_plot_limits(0, 1, 0, 1)
+        xs = np.array([state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)])
+        ys = np.array([state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)])
+        implot.set_next_axes_limits(0, 1, 0, 1)
         implot.set_next_marker_style(size=6*self.ui_scale)
-        implot.begin_plot('LDS', size=(plot_side, plot_side))
-        implot.plot_scatter2('Sequence', toarr(xs), toarr(ys), len(xs))
-        implot.end_plot()
+        if implot.begin_plot('LDS', size=(plot_side, plot_side)):
+            implot.plot_scatter('Sequence', xs=xs, ys=ys)
+            implot.end_plot()
 
 if __name__ == '__main__':
     viewer = Viewer('LDS viewer')
