@@ -223,9 +223,8 @@ class Viewer(AutoUIViewer):
                 implot3d.plot_scatter('Sequence', xs, ys, zs)
                 implot3d.end_plot()
         else:        
-            implot.set_next_axes_limits(0, 1, 0, 1)
             implot.set_next_marker_style(size=6*self.ui_scale)
-            if implot.begin_plot('LDS##2D', size=(avail_w, avail_h)):
+            if implot.begin_plot('LDS##2D', size=(avail_w, avail_h), flags=implot.Flags_.equal):
                 implot.plot_scatter('Sequence', xs=xs, ys=ys)
                 implot.end_plot()
 
