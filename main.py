@@ -3,11 +3,11 @@ import numpy as np
 from math import sqrt
 from functools import lru_cache
 import matplotlib.pyplot as plt
-import glfw
 import pyviewer
 from pyviewer.toolbar_viewer import AutoUIViewer
 from pyviewer.params import *
-from imgui_bundle import implot
+from imgui_bundle import implot, implot3d
+import glfw
 
 assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 
@@ -195,32 +195,39 @@ def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
     seq: Param = EnumSliderParam('Sequence', R2, [
-        murmur, sobol, sobol_cp, sobol_rds,
-        sobol_owen, cascaded_sobol,
-        hammersley, halton, leaped_halton, R2,
+        murmur, sobol, sobol_cp, sobol_rds, sobol_owen,
+        cascaded_sobol, hammersley, halton, leaped_halton, R2,
     ], lambda f: f.__name__)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
     dim2: Param = IntParam('Dimension 2', 1, 0, 50, buttons=True)
+    dim3: Param = IntParam('Dimension 3', 2, 0, 50, buttons=True)
+    plot3d: Param = BoolParam('3D', False)
     
 class Viewer(AutoUIViewer):
     def setup_state(self):
         self.state = State()
+        implot3d.create_context()
     
     def draw_pre(self):
         state = self.state
         W, H = glfw.get_window_size(self.v._window)
         style = imgui.get_style()
-        avail_h = H - self.menu_bar_height - 2*style.window_padding.y
+        avail_h = H - self.menu_bar_height - 2*style.window_padding.y - self.pad_bottom
         avail_w = W - self.toolbar_width
-        plot_side = min(avail_h, avail_w)
         xs = np.array([state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)])
         ys = np.array([state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)])
-        implot.set_next_axes_limits(0, 1, 0, 1)
-        implot.set_next_marker_style(size=6*self.ui_scale)
-        if implot.begin_plot('LDS', size=(plot_side, plot_side)):
-            implot.plot_scatter('Sequence', xs=xs, ys=ys)
-            implot.end_plot()
+        if state.plot3d:
+            zs = np.array([state.seq(i, state.dim3, seed=state.seed, N=state.N) for i in range(state.N)])
+            if implot3d.begin_plot('LDS##3D', size=(avail_w, avail_h)):
+                implot3d.plot_scatter('Sequence', xs, ys, zs)
+                implot3d.end_plot()
+        else:        
+            implot.set_next_axes_limits(0, 1, 0, 1)
+            implot.set_next_marker_style(size=6*self.ui_scale)
+            if implot.begin_plot('LDS##2D', size=(avail_w, avail_h)):
+                implot.plot_scatter('Sequence', xs=xs, ys=ys)
+                implot.end_plot()
 
 if __name__ == '__main__':
     viewer = Viewer('LDS viewer')
