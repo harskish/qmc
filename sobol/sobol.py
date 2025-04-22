@@ -1,8 +1,12 @@
 from pathlib import Path
 from .direction_numbers import get_direction_numbers, get_burley_direction_numbers
 
-directions = get_direction_numbers(dims=100)
-#directions = get_burley_direction_numbers()
+directions = None
+def get_directions():
+    global directions
+    if directions is None:
+        directions = get_direction_numbers(dims=100)
+        #directions = get_burley_direction_numbers()
 
 MASK_32BIT = 0xffffffff
 MASK_64BIT = 0xffffffffffffffff
@@ -64,6 +68,7 @@ def owen_scramble_reference(n: int, seed: int) -> int:
     return out_bits
 
 def sobol_int(index: int, dim: int) -> int:
+    get_directions()
     assert dim < len(directions)
     X = 0
     for bit in range(32):

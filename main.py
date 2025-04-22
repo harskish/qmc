@@ -1,13 +1,14 @@
+import time
 from collections import defaultdict
 import numpy as np
 from math import sqrt
 from functools import lru_cache
-import matplotlib.pyplot as plt
 import pyviewer
 from pyviewer.toolbar_viewer import AutoUIViewer
 from pyviewer.params import *
 from imgui_bundle import implot, implot3d
 import glfw
+from sobol import *
 
 assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 
@@ -179,35 +180,30 @@ def random(i: int, dim: int, seed: int, N: int):
 def murmur(i: int, dim: int, seed: int, N: int):
     return hash(hash_combine(i, hash_combine(dim, seed))) * ONE_OVER_U32_MAX
 
-def plot_2d(func, dim1, dim2, *args, N=1024, **kwargs):
-    global fig
-    if func.__name__ == 'hammersley':
-        kwargs['N'] = N
-    xs = [func(i, dim1, *args, **kwargs) for i in range(N)]
-    ys = [func(i, dim2, *args, **kwargs) for i in range(N)]
-    plt.plot(xs, ys, 'bo')
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.title(f'{func.__name__} dims=({dim1},{dim2})\nseed{kwargs.get("seed", 0)}')
-    return fig
-
 @strict_dataclass
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
-    seq: Param = EnumSliderParam('Sequence', R2, [
+    seq: Param = EnumSliderParam('Sequence', sobol_owen, [
         murmur, sobol, sobol_cp, sobol_rds, sobol_owen,
         cascaded_sobol, hammersley, halton, leaped_halton, R2,
     ], lambda f: f.__name__)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
-    dim1: Param = IntParam('Dimension 1', 0, 0, 50, buttons=True)
-    dim2: Param = IntParam('Dimension 2', 1, 0, 50, buttons=True)
-    dim3: Param = IntParam('Dimension 3', 2, 0, 50, buttons=True)
+    dim1: Param = IntParam('X dimension', 0, 0, 50, buttons=True)
+    dim2: Param = IntParam('Y dimension', 1, 0, 50, buttons=True)
+    dim3: Param = IntParam('Z dimension', 2, 0, 50, buttons=True)
     plot3d: Param = BoolParam('3D', False)
     
 class Viewer(AutoUIViewer):
     def setup_state(self):
         self.state = State()
         implot3d.create_context()
+        self.arr_create_time = 0
+
+    @lru_cache(maxsize=1)
+    def get_data(self, fun, N, seed, dim1, dim2, dim3):
+        return np.array([fun(i, dim1, seed=seed, N=N) for i in range(N)]), \
+               np.array([fun(i, dim2, seed=seed, N=N) for i in range(N)]), \
+               np.array([fun(i, dim3, seed=seed, N=N) for i in range(N)])
     
     def draw_pre(self):
         state = self.state
@@ -215,18 +211,26 @@ class Viewer(AutoUIViewer):
         style = imgui.get_style()
         avail_h = H - self.menu_bar_height - 2*style.window_padding.y - self.pad_bottom
         avail_w = W - self.toolbar_width
-        xs = np.array([state.seq(i, state.dim1, seed=state.seed, N=state.N) for i in range(state.N)])
-        ys = np.array([state.seq(i, state.dim2, seed=state.seed, N=state.N) for i in range(state.N)])
+        t0 = time.monotonic()
+        xs, ys, zs = self.get_data(self.state.seq, state.N, state.seed, state.dim1, state.dim2, state.dim3) # cached
+        self.arr_create_time = time.monotonic() - t0
+        
         if state.plot3d:
-            zs = np.array([state.seq(i, state.dim3, seed=state.seed, N=state.N) for i in range(state.N)])
             if implot3d.begin_plot('LDS##3D', size=(avail_w, avail_h)):
+                implot3d.set_next_marker_style(size=6*self.ui_scale)
+                implot3d.setup_box_scale(1.2, 1.2, 1.2)
                 implot3d.plot_scatter('Sequence', xs, ys, zs)
                 implot3d.end_plot()
-        else:        
-            implot.set_next_marker_style(size=6*self.ui_scale)
+        else:
             if implot.begin_plot('LDS##2D', size=(avail_w, avail_h), flags=implot.Flags_.equal):
+                implot.set_next_marker_style(size=6*self.ui_scale)
                 implot.plot_scatter('Sequence', xs=xs, ys=ys)
                 implot.end_plot()
+    
+    def draw_toolbar_autoUI(self, containers=None):
+        self.state['dim3'].active = self.state.plot3d
+        draw_container(self.state, reset_button=True)
+        imgui.text(f'Arr: {self.arr_create_time*1000:.0f}ms')
 
 if __name__ == '__main__':
     viewer = Viewer('LDS viewer')
