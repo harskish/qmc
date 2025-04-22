@@ -195,9 +195,10 @@ class State(ParamContainer):
     
 class Viewer(AutoUIViewer):
     def setup_state(self):
-        self.state = State()
         implot3d.create_context()
+        self.draw_scale_buttons = False
         self.arr_create_time = 0
+        self.state = State()
 
     @lru_cache(maxsize=1)
     def get_data(self, fun, N, seed, dim1, dim2, dim3):
@@ -212,7 +213,7 @@ class Viewer(AutoUIViewer):
         avail_h = H - self.menu_bar_height - 2*style.window_padding.y - self.pad_bottom
         avail_w = W - self.toolbar_width
         t0 = time.monotonic()
-        xs, ys, zs = self.get_data(self.state.seq, state.N, state.seed, state.dim1, state.dim2, state.dim3) # cached
+        xs, ys, zs = self.get_data(state.seq, state.N, state.seed, state.dim1, state.dim2, state.dim3) # cached
         self.arr_create_time = time.monotonic() - t0
         
         if state.plot3d:
