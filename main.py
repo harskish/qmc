@@ -57,6 +57,9 @@ assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 # - Random sample offsetting: might be slow, depending on sampler
 # - Cranley-patterson rotation: increases variance
 
+# https://github.com/sparks-baird/self-driving-lab-demo/blob/main/notebooks/escience/1.0-traditional-doe-vs-bayesian.ipynb
+print('TODO: measure discrepancy with scipy.stats.qmc.discrepancy')
+
 BIG_PRIME = 15487313
 
 from sobol import *
