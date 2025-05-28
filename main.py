@@ -53,14 +53,15 @@ assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 # - might leave artifacts in the image plane
 
 # Sample decorrelation:
-# - Shufflig (e.g. Owen): works well
+# - Shuffling (e.g. Owen): works well
 # - Random sample offsetting: might be slow, depending on sampler
 # - Cranley-patterson rotation: increases variance
 
 # https://github.com/sparks-baird/self-driving-lab-demo/blob/main/notebooks/escience/1.0-traditional-doe-vs-bayesian.ipynb
 print('TODO: measure discrepancy with scipy.stats.qmc.discrepancy')
 
-BIG_PRIME = 15487313
+#BIG_PRIME = 15487313 # = nth_prime(1_000_091)
+BIG_PRIME =  7778777 # = nth_prime(525_831)
 
 from sobol import *
 
@@ -81,7 +82,7 @@ def is_prime(a):
             return False
     return True
 
-@lru_cache
+@lru_cache(maxsize=None)
 def nth_prime(n):
     """ Returns the Nth prime (zero-indexed) """
     if n == 0:
@@ -141,11 +142,17 @@ def hammersley(i: int, dim: int, N: int, seed: int = 0):
         return i / N
     return halton(i, dim - 1)
 
-# extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
-def R2(i: int, dim: int, N: int, seed: int = 0):
-    max_dim = 2 # looks bad for higher values
+# [1] extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+# [2] martysmods.com/a-better-r2-sequence/
+def Weyl(i: int, dim: int, N: int, seed: int = 0, max_dim: int = 2):
     p = pow(1/phi(max_dim), dim+1) % 1 # inverse power of plastic number
-    return cranley_patterson_rotation(p*i, dim, seed)
+    return cranley_patterson_rotation((1-p)*(i+1), dim, seed) # p => (1-p), see [2]
+
+def R2(i: int, dim: int, N: int, seed: int = 0):
+    return Weyl(i, dim, N, seed, max_dim=2)
+
+def R3(i: int, dim: int, N: int, seed: int = 0):
+    return Weyl(i, dim, N, seed, max_dim=3)
 
 # Getting favorable convergence with high-dimensional Sobol sequences requires huge sample counts (Burley2020 sec. 2.3)
 # => instead use low-dimensional 4D sequence, pad with shuffled RQMC point sets (here: Owen-shuffled)
@@ -159,11 +166,17 @@ def sobol_cpp_impl(variant: str, i: int, dim: int, seed: int = 0, N: int = None)
         _sobol_cache[key] = burley2020.sample(variant, n=n_samp, dim=dim, seed=seed) # scramble seed?
     return _sobol_cache[key][i]
 
-def sobol_owen_cpp(*args, **kwargs):
+def sobol_owen_Burley(*args, **kwargs):
     return sobol_cpp_impl('sobol_owen', *args, **kwargs)
 
-def sobol_rds_cpp(*args, **kwargs):
+def sobol_rds_Burley(*args, **kwargs):
     return sobol_cpp_impl('sobol_rds', *args, **kwargs)
+
+def faure05_Burley(*args, **kwargs):
+    return sobol_cpp_impl('faure05', *args, **kwargs)
+
+def faure05_owen_Burley(*args, **kwargs):
+    return sobol_cpp_impl('faure05_owen', *args, **kwargs)
 
 def sobol_cp(i: int, dim: int, seed: int, N: int):
     _ = N
@@ -186,9 +199,22 @@ def murmur(i: int, dim: int, seed: int, N: int):
 @strict_dataclass
 class State(ParamContainer):
     N: Param = IntParam('Samples', 128, 1, 2048)
-    seq: Param = EnumSliderParam('Sequence', sobol_owen, [
-        murmur, sobol, sobol_cp, sobol_rds, sobol_owen,
-        cascaded_sobol, hammersley, halton, leaped_halton, R2,
+    seq: Param = EnumParam('Sequence', sobol_owen_vegdahl, [
+        murmur,              # Murmurhash3 finalizer (non-LDS)
+        sobol,               # Standard Sobol (no scrambling or shuffling)
+        sobol_cp,            # Sobol + Cranley Patterson rotation (scrambling of values)
+        sobol_rds,           # Sobol + random digit scrambling (of values)
+        sobol_owen_ref,      # 'Ground-truth' Owen scrambling (value scrambling + idx shuffling) [buggy?!]
+        sobol_owen_vegdahl,  # Fast Owen scrambling using Vegdahl hash
+        sobol_owen_Burley,   # Burley2020 reference C++ Owen-scrambled Sobol
+        cascaded_sobol,      # Paulin2021 C++ impl
+        faure05_Burley,      # Burley2020 reference C++ Faure05 sampler
+        faure05_owen_Burley, # Burley2020 reference C++ Faure05 + Owen scrambling
+        hammersley,          # Standard Hammersley (no scrambling or shuffling)
+        halton,              # Standard Halton (no scrambling or shuffling)
+        leaped_halton,       # Leaped Halton (seeded prime-sized strides on idx)
+        R2,                  # R2 sequence (2D "Roberts Sequence", i.e. Golden ratio Weyl sequence)
+        R3,                  # R3 sequence (3D "Roberts Sequence", i.e. Golden ratio Weyl sequence)
     ], lambda f: f.__name__)
     seed: Param = IntParam('Seed', 0, 0, 99, buttons=True)
     dim1: Param = IntParam('X dimension', 0, 0, 50, buttons=True)

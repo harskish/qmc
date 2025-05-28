@@ -50,8 +50,5 @@ std::vector<float> sample(const char* seq, int n, int dim, const int seed) {
 }
 
 PYBIND11_MODULE(burley2020ext, m) {
-    //m.def("register", &register_resource, "register resource");
-    //m.def("unregister", &unregister_resource, "unregister resource");
-    //m.def("upload", &upload, "upload image data");
     m.def("sample", &sample, "sample sequence");
 }

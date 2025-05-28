@@ -1,12 +1,11 @@
 from pathlib import Path
-from .direction_numbers import get_direction_numbers, get_burley_direction_numbers
+from .direction_numbers import get_direction_numbers
 
 directions = None
 def get_directions():
     global directions
     if directions is None:
         directions = get_direction_numbers(dims=100)
-        #directions = get_burley_direction_numbers()
 
 MASK_32BIT = 0xffffffff
 MASK_64BIT = 0xffffffffffffffff
@@ -34,6 +33,7 @@ def hash(x: int):
     x = x ^ (x >> 16)
     return x
 
+# Complexity is loglogX?
 def reverse_bits(x: int) -> int:
     x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1))
     x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2))
@@ -51,6 +51,8 @@ def vegdahl_permutation(x, seed):
     x ^= x * 0x53a22864
     return i32(x)
 
+# Source: Burley2020, Listing 2
+# Example usage: https://www.shadertoy.com/view/wlyyDm
 def nested_uniform_scramble_base2(x, seed):
     x = reverse_bits(x)
     x = vegdahl_permutation(x, seed) # laine_karras_permutation(x, seed);
@@ -71,7 +73,7 @@ def sobol_int(index: int, dim: int) -> int:
     get_directions()
     assert dim < len(directions)
     X = 0
-    for bit in range(32):
+    for bit in range(32): # log2(N)
         mask = (index >> bit) & 1
         X ^= mask * directions[dim][bit]
     return X
@@ -87,7 +89,7 @@ def sobol_rds(i, dim, seed=0, N=None) -> float:
     scramble = hash_combine(seed, hash(dim))
     return (sobol_int(i,dim) ^ scramble) * ONE_OVER_U32_MAX
 
-def sobol_owen(i, dim, seed=0, N=None) -> float:
+def sobol_owen_vegdahl(i, dim, seed=0, N=None) -> float:
     _ = N
     seed = hash(seed)
     index = nested_uniform_scramble_base2(i, seed)
