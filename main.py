@@ -220,6 +220,8 @@ class State(ParamContainer):
     dim1: Param = IntParam('X dimension', 0, 0, 50, buttons=True)
     dim2: Param = IntParam('Y dimension', 1, 0, 50, buttons=True)
     dim3: Param = IntParam('Z dimension', 2, 0, 50, buttons=True)
+    to_disk: Param = BoolParam('Map to disk', False, tooltip='Map samples to disk (Shirley-Chiu mapping)')
+    to_tri: Param = BoolParam('Map to triangle', False, tooltip='Map samples to triangle (Heitz-Kemppinen)')
     plot3d: Param = BoolParam('3D', False)
     
 class Viewer(AutoUIViewer):
@@ -235,6 +237,19 @@ class Viewer(AutoUIViewer):
                np.array([fun(i, dim2, seed=seed, N=N) for i in range(N)]), \
                np.array([fun(i, dim3, seed=seed, N=N) for i in range(N)])
     
+    def square_to_disk(self, xs: np.ndarray, ys: np.ndarray):
+        """Map [0,1]^2 to the unit disk using Shirley-Chiu mapping"""
+        x = np.stack((xs, ys), -1)
+        x, y = x[..., 0] - x[..., 1], x[..., 0] + x[..., 1] - 1.
+        r = np.abs(x) + np.abs(y)
+        a = x / np.maximum(r, 1e-6) * (np.pi * .5)
+        return r[..., None] * np.stack([np.sin(a), np.cos(a) * np.sign(y)], -1)
+
+    def square_to_triangle(self, xs, ys):
+        """Branchless version of Heitz' mapping by Pauli"""
+        offset = 0.5 * np.minimum(xs, ys)
+        return xs - offset, ys - offset
+    
     def draw_pre(self):
         state = self.state
         W, H = glfw.get_window_size(self.v._window)
@@ -243,6 +258,13 @@ class Viewer(AutoUIViewer):
         avail_w = W - self.toolbar_width
         t0 = time.monotonic()
         xs, ys, zs = self.get_data(state.seq, state.N, state.seed, state.dim1, state.dim2, state.dim3) # cached
+        
+        if state.to_tri:
+            xs, ys = self.square_to_triangle(xs, ys)
+        
+        if state.to_disk:
+            xs, ys = self.square_to_disk(xs, ys).T.copy() * 0.5 + 0.5 # to [0, 1]
+        
         self.arr_create_time = time.monotonic() - t0
         
         if state.plot3d:
