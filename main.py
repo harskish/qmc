@@ -137,6 +137,14 @@ def leaped_halton(i: int, dim: int, seed: int = 0, N: int = None):
     leap = nth_prime(seed + 79) # start at 409
     return radical_inverse(b, i*leap) # include zero [3,4]
 
+def halton_rds(i: int, dim: int, seed: int = 0, N: int = None):
+    _ = N
+    b = nth_prime(dim)
+    v_int = i32(int(radical_inverse(b, i) * (1<<32)))
+    #v_flt = (v_int ^ i32(seed * BIG_PRIME)) / (1<<32) # cool jitter
+    v_flt = (v_int ^ hash(seed)) / (1<<32)
+    return v_flt
+
 def hammersley(i: int, dim: int, N: int, seed: int = 0):
     if dim == 0:
         return i / N
@@ -213,6 +221,7 @@ class State(ParamContainer):
         hammersley,          # Standard Hammersley (no scrambling or shuffling)
         halton,              # Standard Halton (no scrambling or shuffling)
         leaped_halton,       # Leaped Halton (seeded prime-sized strides on idx)
+        halton_rds,          # Halton + value scrambling (rds)
         R2,                  # R2 sequence (2D "Roberts Sequence", i.e. Golden ratio Weyl sequence)
         R3,                  # R3 sequence (3D "Roberts Sequence", i.e. Golden ratio Weyl sequence)
     ], lambda f: f.__name__)
