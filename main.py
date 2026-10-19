@@ -9,6 +9,7 @@ from pyviewer.params import *
 from imgui_bundle import implot, implot3d
 import glfw
 from sobol import *
+from torch.quasirandom import SobolEngine
 
 assert pyviewer.__version__ >= '2.0.0', 'pyviewer 2.0.0+ required'
 
@@ -198,6 +199,12 @@ def cascaded_sobol(i: int, dim: int, seed: int, N: int):
     import paulin2021
     return paulin2021.sample_ref(i, dim, seed)
 
+_torch_sobol_seq: dict[tuple[int, int], list] = {}
+def torch_sobol(i: int, dim: int, seed: int, N: int):
+    if (dim, seed, N) not in _torch_sobol_seq:
+        _torch_sobol_seq[(dim, seed, N)] = SobolEngine(dimension=dim+1, scramble=(seed != 0), seed=seed).draw(N)[:, dim].tolist()
+    return _torch_sobol_seq[(dim, seed, N)][i]
+
 def random(i: int, dim: int, seed: int, N: int):
     return seeded_rand(hash_combine(i, hash_combine(dim, seed)))
 
@@ -216,6 +223,7 @@ class State(ParamContainer):
         sobol_owen_vegdahl,  # Fast Owen scrambling using Vegdahl hash
         sobol_owen_Burley,   # Burley2020 reference C++ Owen-scrambled Sobol
         cascaded_sobol,      # Paulin2021 C++ impl
+        torch_sobol,         # PyTorch's Sobol
         faure05_Burley,      # Burley2020 reference C++ Faure05 sampler
         faure05_owen_Burley, # Burley2020 reference C++ Faure05 + Owen scrambling
         hammersley,          # Standard Hammersley (no scrambling or shuffling)
