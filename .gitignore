@@ -3,3 +3,5 @@
 **/__pycache__
 sobol/_sobol_direction_numbers.npz
 *.ini
+.envrc
+.direnv/
